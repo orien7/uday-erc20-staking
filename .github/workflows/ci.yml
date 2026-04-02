@@ -1,0 +1,42 @@
+name: CI — Compile & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Hardhat Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: project1-erc20-staking/package-lock.json
+
+      - name: Install dependencies
+        working-directory: project1-erc20-staking
+        run: npm install
+
+      - name: Compile contracts
+        working-directory: project1-erc20-staking
+        run: npx hardhat compile
+
+      - name: Run tests
+        working-directory: project1-erc20-staking
+        run: npx hardhat test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: project1-erc20-staking/coverage/

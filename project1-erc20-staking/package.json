@@ -1,0 +1,19 @@
+{
+  "name": "project1-erc20-staking",
+  "version": "1.0.0",
+  "description": "ERC-20 Token + Staking Rewards — Production-grade Solidity smart contracts",
+  "author": "Uday Kumar BS <uday.kumarbs@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "verify": "hardhat verify"
+  },
+  "devDependencies": {
+    "hardhat": "^2.22.0",
+    "@nomicfoundation/hardhat-toolbox": "hh2",
+    "@openzeppelin/contracts": "^5.0.0",
+    "dotenv": "^16.0.0"
+  }
+}
