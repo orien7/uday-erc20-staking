@@ -19,12 +19,15 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
+        working-directory: ./project1-erc20-staking
         run: npm install
 
       - name: Compile contracts
+        working-directory: ./project1-erc20-staking
         run: npx hardhat compile
 
       - name: Run tests
+        working-directory: ./project1-erc20-staking
         run: npx hardhat test
 
   deploy-contracts:
@@ -43,10 +46,12 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
+        working-directory: ./project1-erc20-staking
         run: npm install
 
       - name: Deploy contracts
         id: deploy
+        working-directory: ./project1-erc20-staking
         run: |
           OUTPUT=$(npx hardhat run scripts/deploy.js --network sepolia 2>&1)
           echo "$OUTPUT"
@@ -59,6 +64,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
       - name: Verify on Etherscan
+        working-directory: ./project1-erc20-staking
         run: |
           npx hardhat verify --network sepolia ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} || true
           npx hardhat verify --network sepolia ${{ steps.deploy.outputs.staking_address }} ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} 1000 7 || true
@@ -84,11 +90,11 @@ jobs:
         run: npm install -g vercel
 
       - name: Install frontend dependencies
-        working-directory: ./frontend
+        working-directory: ./project1-erc20-staking/frontend
         run: npm install
 
       - name: Build frontend
-        working-directory: ./frontend
+        working-directory: ./project1-erc20-staking/frontend
         run: npm run build
         env:
           VITE_TOKEN_ADDRESS: ${{ needs.deploy-contracts.outputs.token_address }}
@@ -96,7 +102,7 @@ jobs:
           VITE_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
 
       - name: Deploy to Vercel
-        working-directory: ./frontend
+        working-directory: ./project1-erc20-staking/frontend
         run: vercel --prod --yes --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
