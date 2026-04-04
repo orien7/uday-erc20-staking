@@ -1,42 +1,157 @@
-name: CI — Compile & Test
+# .github/workflows/ci-cd.yml
+name: CI/CD — Test · Deploy · Frontend
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
+env:
+  NODE_VERSION: '22'
+
 jobs:
+
+  # ── JOB 1: Compile + Test (runs on every push/PR) ──────────────────────
   test:
-    name: Hardhat Tests
+    name: Compile & Test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
           cache-dependency-path: project1-erc20-staking/package-lock.json
 
       - name: Install dependencies
-        working-directory: project1-erc20-staking
+        working-directory: .
         run: npm install
 
       - name: Compile contracts
-        working-directory: project1-erc20-staking
+        working-directory: .
         run: npx hardhat compile
 
-      - name: Run tests
-        working-directory: project1-erc20-staking
+      - name: Run tests (local Hardhat network)
+        working-directory: .
         run: npx hardhat test
+        env:
+          REPORT_GAS: true
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-p1
           path: project1-erc20-staking/coverage/
+
+  # ── JOB 2: Deploy contracts to Sepolia (main branch only) ──────────────
+  deploy-contracts:
+    name: Deploy to Sepolia
+    runs-on: ubuntu-latest
+    needs: test                    # only runs if tests pass
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    outputs:
+      token_address: ${{ steps.deploy.outputs.token_address }}
+      staking_address: ${{ steps.deploy.outputs.staking_address }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: project1-erc20-staking/package-lock.json
+
+      - name: Install dependencies
+        working-directory: .
+        run: npm install
+
+      - name: Deploy contracts
+        id: deploy
+        working-directory: .
+        run: |
+          OUTPUT=$(npx hardhat run scripts/deploy.js --network sepolia 2>&1)
+          echo "$OUTPUT"
+          TOKEN=$(echo "$OUTPUT" | grep "UDAYToken deployed to:" | awk '{print $NF}')
+          STAKING=$(echo "$OUTPUT" | grep "StakingRewards deployed to:" | awk '{print $NF}')
+          echo "token_address=$TOKEN" >> $GITHUB_OUTPUT
+          echo "staking_address=$STAKING" >> $GITHUB_OUTPUT
+          echo "TOKEN=$TOKEN" >> $GITHUB_ENV
+          echo "STAKING=$STAKING" >> $GITHUB_ENV
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Verify on Etherscan
+        working-directory: .
+        run: |
+          npx hardhat verify --network sepolia ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} || true
+          npx hardhat verify --network sepolia ${{ steps.deploy.outputs.staking_address }} ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} 1000 7 || true
+        env:
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Save deployed addresses
+        run: |
+          echo "TOKEN_ADDRESS=${{ steps.deploy.outputs.token_address }}" >> deployment.env
+          echo "STAKING_ADDRESS=${{ steps.deploy.outputs.staking_address }}" >> deployment.env
+          cat deployment.env
+
+      - name: Upload deployment info
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-addresses-p1
+          path: deployment.env
+
+  # ── JOB 3: Deploy frontend to Vercel ───────────────────────────────────
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: deploy-contracts
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+        env:
+          VITE_TOKEN_ADDRESS: ${{ needs.deploy-contracts.outputs.token_address }}
+          VITE_STAKING_ADDRESS: ${{ needs.deploy-contracts.outputs.staking_address }}
+          VITE_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+
+      - name: Deploy to Vercel
+        working-directory: ./frontend
+        run: |
+          vercel --prod --yes \
+            --token ${{ secrets.VERCEL_TOKEN }} \
+            --env VITE_TOKEN_ADDRESS=${{ needs.deploy-contracts.outputs.token_address }} \
+            --env VITE_STAKING_ADDRESS=${{ needs.deploy-contracts.outputs.staking_address }} \
+            --env VITE_RPC_URL=${{ secrets.SEPOLIA_RPC_URL }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
