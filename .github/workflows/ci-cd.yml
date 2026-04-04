@@ -21,13 +21,13 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        working-directory: project1-erc20-staking
+        working-directory: .
         run: npm install
 
       - name: Compile contracts
-        working-directory: project1-erc20-staking
+        working-directory: .
         run: npx hardhat compile
 
       - name: Run tests
-        working-directory: project1-erc20-staking
+        working-directory: .
         run: npx hardhat test
