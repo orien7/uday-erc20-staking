@@ -49,31 +49,37 @@ jobs:
         working-directory: ./project1-erc20-staking
         run: npm install
 
-      - name: Deploy contracts
-        id: deploy
-        working-directory: ./project1-erc20-staking
-        run: |
-          OUTPUT=$(npx hardhat run scripts/deploy.js --network sepolia 2>&1)
-          echo "$OUTPUT"
-          TOKEN=$(echo "$OUTPUT" | grep "UDAYToken deployed to:" | awk '{print $NF}')
-          STAKING=$(echo "$OUTPUT" | grep "StakingRewards deployed to:" | awk '{print $NF}')
-          echo "token_address=$TOKEN" >> $GITHUB_OUTPUT
-          echo "staking_address=$STAKING" >> $GITHUB_OUTPUT
-        env:
-          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        # disabled until Sepolia ETH funded
+      #- name: Deploy contracts
+       # id: deploy
+       # working-directory: ./project1-erc20-staking
+        # run: |
+          # OUTPUT=$(npx hardhat run scripts/deploy.js --network sepolia 2>&1)
+          # echo "$OUTPUT"
+          # TOKEN=$(echo "$OUTPUT" | grep "UDAYToken deployed to:" | awk '{print $NF}')
+          # STAKING=$(echo "$OUTPUT" | grep "StakingRewards deployed to:" | awk '{print $NF}')
+          # echo "token_address=$TOKEN" >> $GITHUB_OUTPUT
+          # echo "staking_address=$STAKING" >> $GITHUB_OUTPUT
+        # env:
+          # SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          # PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
-      - name: Verify on Etherscan
-        working-directory: ./project1-erc20-staking
-        run: |
-          npx hardhat verify --network sepolia ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} || true
-          npx hardhat verify --network sepolia ${{ steps.deploy.outputs.staking_address }} ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} 1000 7 || true
-        env:
-          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
-          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-        continue-on-error: true
-
+      #- name: Verify on Etherscan
+       # working-directory: ./project1-erc20-staking
+        # run: |
+         #  npx hardhat verify --network sepolia ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} || true
+         #  npx hardhat verify --network sepolia ${{ steps.deploy.outputs.staking_address }} ${{ steps.deploy.outputs.token_address }} ${{ secrets.DEPLOYER_ADDRESS }} 1000 7 || true
+       #  env:
+         #  SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+         #  ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+         #  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        # continue-on-error: true
+deploy-contracts:
+    name: Deploy to Sepolia
+    runs-on: ubuntu-latest
+    needs: test
+    if: false   # disabled until Sepolia ETH funded
+    
   deploy-frontend:
     name: Deploy Frontend
     runs-on: ubuntu-latest
